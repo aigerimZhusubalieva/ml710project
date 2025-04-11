@@ -19,9 +19,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, rank):
         images = images.to(rank)
         labels = labels.to(rank)
 
-        
-
-
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -41,25 +38,3 @@ def evaluate(model, dataloader, criterion, rank):
             correct += (predicted == labels).sum().item()
     if rank == 0:
         print(f"Accuracy: {100 * correct / total:.2f}%")
-
-
-def save_split(split_name):
-    split = dataset[split_name]
-    image_id = 0
-    for example in tqdm(split, desc=f"Saving {split_name}"):
-        label = example["label"]
-        label_name = dataset["train"].features["label"].int2str(label)
-        image = example["image"]
-        image: Image.Image  # PIL image
-
-        # Build directory path
-        split_dir = os.path.join(output_root, split_name, label_name)
-        os.makedirs(split_dir, exist_ok=True)
-
-        # Create a unique filename
-        image_id+=1
-        filename = f"{image_id}.jpg"
-        filepath = os.path.join(split_dir, filename)
-
-        # Save image
-        image.save(filepath)
