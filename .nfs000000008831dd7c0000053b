@@ -20,6 +20,8 @@ def main():
     parser = deepspeed.add_config_arguments(parser)
     args = parser.parse_args()
 
+    wandb.login(key="9070ac0892430e02d60f5f9927d269ca331fe9c2")
+    
     # Setup Weights & Biases
     run = wandb.init(
         entity="ML701",   
