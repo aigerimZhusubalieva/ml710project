@@ -1,0 +1,8 @@
+torch
+torchvision
+datasets
+tqdm
+pillow
+wandb
+pynvml
+deepspeed

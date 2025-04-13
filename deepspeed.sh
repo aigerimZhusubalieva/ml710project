@@ -11,18 +11,24 @@ workdir=/home/aigerim.zhusubalieva/ML710/code
 master_node=ws-l4-012
 worker_node=ws-l4-006
 
+MASTER_PORT=29500
+export MASTER_PORT=$MASTER_PORT
+
+
 # ------ End of changeable variables ------
 BASE_PATH=$workdir
-DATA_PATH=/home/aigerim.zhusubalieva/ML710/imagenet_2class
+DATA_PATH=/home/aigerim.zhusubalieva/ML710/imagenet_mini
 DS_CONFIG=$workdir/ds_config.json
 HOST_FILE=$workdir/hostfile
 OUTPUT_DIR=$workdir/output/vgg16_output
 
 # Hyperparameters for VGG16 training
-GLOBAL_BATCH=64
-MICRO_BATCH=32
+GLOBAL_BATCH=128
+MICRO_BATCH=64
 ZERO_STAGE=1
 export CUDA_DEVICE_MAX_CONNECTIONS=1
+export NCCL_DEBUG=INFO
+export DEEPSPEED_LOG_LEVEL=debug
 
 mkdir -p $OUTPUT_DIR
 
@@ -57,7 +63,8 @@ export MAX_JOBS=10
 
 # Start training
 if [ "$(hostname)" == $master_node ]; then
-    deepspeed --num_gpus 1 --num_nodes 2 --hostfile $HOST_FILE --no_ssh --node_rank=0 --master_addr $master_node --master_port=12345 train_vgg16.py \
+    echo "Running on worker node ($(hostname))"
+    deepspeed --num_gpus 1 --num_nodes 2 --hostfile $HOST_FILE --no_ssh --node_rank=0 --master_addr $master_node --master_port=$MASTER_PORT train_vgg16.py \
     --deepspeed \
     --deepspeed_config $DS_CONFIG \
     --epochs 10 \
@@ -66,7 +73,8 @@ if [ "$(hostname)" == $master_node ]; then
     --data-path $DATA_PATH \
     --output-dir $OUTPUT_DIR
 else
-    deepspeed --num_gpus 1 --num_nodes 2 --hostfile $HOST_FILE --no_ssh --node_rank=1 --master_addr $master_node --master_port=12345 train_vgg16.py \
+    echo "Running on worker node ($(hostname))"
+    deepspeed --num_gpus 1 --num_nodes 2 --hostfile $HOST_FILE --no_ssh --node_rank=1 --master_addr $master_node --master_port=$MASTER_PORT train_vgg16.py \
     --deepspeed \
     --deepspeed_config $DS_CONFIG \
     --epochs 10 \

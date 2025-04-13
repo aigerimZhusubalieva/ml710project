@@ -53,7 +53,7 @@ def main():
 
     if model_engine.local_rank == 0:
         torch.save(model.state_dict(), os.path.join(args.output_dir, 'vgg16_final.pth'))
-
+    run.finish()
 if __name__ == "__main__":
     import deepspeed
     main()
