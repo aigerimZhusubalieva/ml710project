@@ -1,2 +1,4 @@
 imagenet_mini/
 imagenet_2class/
+models/
+wandb/
