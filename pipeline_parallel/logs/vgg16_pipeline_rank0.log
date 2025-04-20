@@ -1,0 +1,11 @@
+[RANK 0] 2025-04-20 07:32:55,044 - INFO - Logger initialized
+[RANK 0] 2025-04-20 07:33:05,444 - INFO - started training. time: 1745119985.4441085 
+[RANK 0] 2025-04-20 07:33:23,879 - INFO - [Epoch 1] Throughput: 22.56 img/s | train loss: 6.705528846153846 steps: 13 total samples in epoch: 416 time elapsed: 18.435792684555054 overall time elapsed: 18.435792684555054 overall samples: 416 Statistical Efficiency: 0.00
+[RANK 0] 2025-04-20 07:33:23,880 - INFO - started training. time: 1745120003.880213 
+[RANK 0] 2025-04-20 07:33:41,855 - INFO - [Epoch 2] Throughput: 23.14 img/s | train loss: 5.129206730769231 steps: 13 total samples in epoch: 416 time elapsed: 17.975260734558105 overall time elapsed: 36.41105341911316 overall samples: 832 Statistical Efficiency: 0.12
+[RANK 0] 2025-04-20 07:33:41,855 - INFO - started training. time: 1745120021.8557818 
+[RANK 0] 2025-04-20 07:33:59,762 - INFO - [Epoch 3] Throughput: 23.23 img/s | train loss: 4.920372596153846 steps: 13 total samples in epoch: 416 time elapsed: 17.90685510635376 overall time elapsed: 54.31790852546692 overall samples: 1248 Statistical Efficiency: 0.02
+[RANK 0] 2025-04-20 07:33:59,762 - INFO - started training. time: 1745120039.7629502 
+[RANK 0] 2025-04-20 07:34:17,808 - INFO - [Epoch 4] Throughput: 23.05 img/s | train loss: 4.7959735576923075 steps: 13 total samples in epoch: 416 time elapsed: 18.04574680328369 overall time elapsed: 72.36365532875061 overall samples: 1664 Statistical Efficiency: 0.01
+[RANK 0] 2025-04-20 07:34:17,808 - INFO - started training. time: 1745120057.8089867 
+[RANK 0] 2025-04-20 07:34:35,704 - INFO - [Epoch 5] Throughput: 23.25 img/s | train loss: 4.804086538461538 steps: 13 total samples in epoch: 416 time elapsed: 17.89557194709778 overall time elapsed: 90.25922727584839 overall samples: 2080 Statistical Efficiency: 0.00
