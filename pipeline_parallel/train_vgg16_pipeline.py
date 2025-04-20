@@ -14,8 +14,8 @@ import logging
 from datetime import datetime
 import time
 from torch.distributed import get_rank, is_initialized
-from torch.utils.data import Subset
-import random
+# from torch.utils.data import Subset
+# import random
 
 def setup_logger(log_dir="logs", filename_prefix="train"):
     os.makedirs(log_dir, exist_ok=True)
@@ -67,6 +67,7 @@ def parse_args():
 def get_vgg16_pipeline_model(num_classes=100):
     # Define VGG16 as a pipeline
     vgg16 = torchvision.models.vgg16(weights='IMAGENET1K_V1')
+    vgg16.classifier[6] = nn.Linear(4096, 100)  
 
     # Set all ReLU layers to inplace=False
     for module in vgg16.modules():
@@ -79,10 +80,9 @@ def get_vgg16_pipeline_model(num_classes=100):
 
 
     layers = [
-    LayerSpec(nn.Sequential, *features[:20]),                    # First 20 layers
-    # LayerSpec(nn.Sequential, *features[20:], *avgpool, *classifier),  # Remaining + FC
-    LayerSpec(nn.Sequential, *features[20:], *avgpool, nn.Flatten(), *classifier)
-]
+        LayerSpec(nn.Sequential, *features[:16]),  
+        LayerSpec(nn.Sequential, *features[16:], *avgpool, nn.Flatten(), *classifier)
+    ]
 
     return PipelineModule(layers=layers,
                            loss_fn=nn.CrossEntropyLoss(),
@@ -114,22 +114,22 @@ class BatchIterator:
 # Validation loop
 # ------------------------------
 
-def evaluate(engine, val_loader, device):
-    engine.eval()
-    total_loss = 0.0
-    total_samples = 0
+# def evaluate(engine, val_loader, device):
+#     engine.eval()
+#     total_loss = 0.0
+#     total_samples = 0
 
-    val_iter = BatchIterator(val_loader, device, fp16_enabled=engine.fp16_enabled())
+#     val_iter = BatchIterator(val_loader, device, fp16_enabled=engine.fp16_enabled())
 
-    for batch in val_iter:
-        repeated_batch = iter([batch] * engine.micro_batches)
-        loss = engine.eval_batch(repeated_batch)
-        total_loss += loss.item() * batch[1].size(0)
-        total_samples += batch[1].size(0)
+#     for batch in val_iter:
+#         repeated_batch = iter([batch] * engine.micro_batches)
+#         loss = engine.eval_batch(repeated_batch)
+#         total_loss += loss.item() * batch[1].size(0)
+#         total_samples += batch[1].size(0)
 
-    avg_loss = total_loss / total_samples
-    engine.train()
-    return avg_loss
+#     avg_loss = total_loss / total_samples
+#     engine.train()
+#     return avg_loss
 
 def main():
     args = parse_args()
@@ -171,19 +171,20 @@ def main():
     valset = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'validation'), transform=transform)
 
 
-    # Set random seed for reproducibility
-    random.seed(42)
+    # # Set random seed for reproducibility
+    # random.seed(42)
 
-    # Use 10% of the training set
-    subset_indices = random.sample(range(len(trainset)), int(0.05 * len(trainset)))
-    trainset = Subset(trainset, subset_indices)
+    # # Use 10% of the training set
+    # subset_indices = random.sample(range(len(trainset)), int(0.05 * len(trainset)))
+    # trainset = Subset(trainset, subset_indices)
+
     train_sampler = DistributedSampler(trainset)
     val_sampler = DistributedSampler(valset)
 
     trainloader = DataLoader(trainset, batch_size=args.batch_size, sampler=train_sampler, drop_last=True)
     valloader = DataLoader(valset, batch_size=args.batch_size, sampler=val_sampler , drop_last=True)
 
-    model = get_vgg16_pipeline_model(num_classes=len(trainset.dataset.classes))
+    model = get_vgg16_pipeline_model(num_classes=len(trainset.classes))
 
     model_engine, _, _, _ = deepspeed.initialize(
         args=args,
@@ -210,23 +211,31 @@ def main():
         total_loss = 0.0
         step = 0
 
-        for batch in train_iter:
-            batch_group = [next(train_iter) for _ in range(2)]  # 2 micro-batches
-            loss = model_engine.train_batch(iter(batch_group))
-            total_loss += loss.item()
-            step += 1
-            total_samples += args.batch_size
-            # Log GPU info + training loss
-            mem_alloc = torch.cuda.memory_allocated(device_id) / (1024 ** 2)
-            mem_res = torch.cuda.memory_reserved(device_id) / (1024 ** 2)
-            util = pynvml.nvmlDeviceGetUtilizationRates(handle).gpu
+        # for batch in train_iter:
+        while True:
+            try:
+                batch_group = [next(train_iter) for _ in range(2)]  # 2 micro-batches
+                loss = model_engine.train_batch(iter(batch_group))
+                total_loss += loss.item()
+                step += 1
+                total_samples += args.batch_size
+                # Log GPU info + training loss
+                mem_alloc = torch.cuda.memory_allocated(device_id) / (1024 ** 2)
+                mem_res = torch.cuda.memory_reserved(device_id) / (1024 ** 2)
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle).gpu
 
-            wandb.log({
-                "train_loss": loss.item(),
-                "gpu_memory_allocated_MB": mem_alloc,
-                "gpu_memory_reserved_MB": mem_res,
-                "gpu_utilization_percent": util
-            })
+                wandb.log({
+                    "train_loss": loss.item(),
+                    "gpu_memory_allocated_MB": mem_alloc,
+                    "gpu_memory_reserved_MB": mem_res,
+                    "gpu_utilization_percent": util
+                })
+            except StopIteration:
+                # Safely drain pipeline and avoid timer errors
+                model_engine.timers("train_batch").reset()
+                model_engine.timers("batch_input").reset()
+                break
+
         
 
         train_loss = total_loss / step
@@ -248,26 +257,27 @@ def main():
         else:
             stat_eff = 0
 
-        if model_engine.global_rank == 0:
-            wandb.log({
-            # "val_loss": val_loss,
-            # "val_accuracy": val_acc,
-            "throughput": throughput,
-            "statistical_efficiency": stat_eff,
-            "epoch": epoch
-        }),
-            logger.info(
-                f"[Epoch {epoch+1}] "
-                f"Throughput: {throughput:.2f} img/s | "
-                # f"Validation loss: {val_loss:.4f} | "
-                f"train loss: {train_loss} "
-                f"steps: {step} "
-                f"total samples in epoch: {total_samples} "
-                f"time elapsed: {elapsed} "
-                f"overall time elapsed: {total_time} "
-                f"overall samples: {global_samples} "
-                f"Statistical Efficiency: {stat_eff:.2f}"
-            )
+        # if model_engine.global_rank == 0:
+        wandb.log({
+        # "val_loss": val_loss,
+        # "val_accuracy": val_acc,
+        "throughput": throughput,
+        "statistical_efficiency": stat_eff,
+        "epoch": epoch
+    }),
+        logger.info(
+            f"Rank {model_engine.global_rank} "
+            f"[Epoch {epoch+1}] "
+            f"Throughput: {throughput:.2f} img/s | "
+            # f"Validation loss: {val_loss:.4f} | "
+            f"train loss: {train_loss} "
+            f"steps: {step} "
+            f"total samples in epoch: {total_samples} "
+            f"time elapsed: {elapsed} "
+            f"overall time elapsed: {total_time} "
+            f"overall samples: {global_samples} "
+            f"Statistical Efficiency: {stat_eff:.2f}"
+        )
 
         print(f"[Epoch {epoch+1}] completed")
 

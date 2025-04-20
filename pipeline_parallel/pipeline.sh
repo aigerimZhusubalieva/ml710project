@@ -21,7 +21,7 @@ OUTPUT_DIR=$workdir/pipeline_parallel/output/vgg16_output
 # Hyperparameters for VGG16 training
 GLOBAL_BATCH=64
 MICRO_BATCH=32
-ZERO_STAGE=1
+# ZERO_STAGE=1
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 mkdir -p $OUTPUT_DIR
