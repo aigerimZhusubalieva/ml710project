@@ -2,4 +2,6 @@ imagenet_mini/
 imagenet_2class/
 models/
 wandb/
-output/output/vgg16_output/vgg16_final.pth
+output/
+ds_config.json
+hostfile
